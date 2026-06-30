@@ -58,9 +58,10 @@ export const callDirectClientSide = async (
   messages: OllamaMessage[],
   format?: any
 ): Promise<string> => {
+  // Only Gemini works directly from the browser (supports CORS)
   const geminiKey = safeGetEnv("GEMINI_API_KEY") || safeGetEnv("VITE_GEMINI_API_KEY");
   if (geminiKey) {
-    console.log("[Client Fallback] Detected GEMINI_API_KEY. Calling Gemini directly from browser...");
+    console.log("[Client Fallback] Calling Gemini directly from browser...");
     try {
       let systemInstruction = "";
       const contents: any[] = [];
@@ -101,9 +102,7 @@ export const callDirectClientSide = async (
         contents.push({ role, parts });
       }
 
-      const payload: any = {
-        contents
-      };
+      const payload: any = { contents };
 
       if (systemInstruction) {
         payload.systemInstruction = {
@@ -140,9 +139,7 @@ export const callDirectClientSide = async (
       const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
       const gRes = await fetch(geminiEndpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 
@@ -158,114 +155,14 @@ export const callDirectClientSide = async (
     }
   }
 
-  // 2. Direct Ollama / SiliconFlow Fallback
-  const directBaseUrl = getOllamaBaseUrl();
-  const directApiKey = getOllamaApiKey();
-  const isOllamaLocal = directBaseUrl.includes("localhost") || directBaseUrl.includes("127.0.0.1") || directBaseUrl.includes("11434");
-
-  let finalBaseUrl = directBaseUrl.trim().replace(/\/+$/, "");
-
-  console.log(`[Client Fallback] Using base URL: ${finalBaseUrl}, API key present: ${!!directApiKey}`);
-
-  if ((finalBaseUrl.includes("siliconflow.cn") || finalBaseUrl.includes("siliconflow.com")) && !finalBaseUrl.includes("/v1")) {
-    finalBaseUrl = `${finalBaseUrl}/v1`;
-  }
-
-  const hasImages = messages.some(
-    (m: any) => m.images && Array.isArray(m.images) && m.images.length > 0
+  // Ollama/SiliconFlow cannot be called directly from the browser (CORS).
+  // All API calls must go through the server at /api/chat.
+  throw new Error(
+    "Server API is unreachable. Make sure your Vercel environment variables are set:\n" +
+    "  OLLAMA_BASE_URL=https://api.ollama.com\n" +
+    "  OLLAMA_API_KEY=your_key_here\n" +
+    "Or use VITE_GEMINI_API_KEY for direct browser-based access."
   );
-
-  let targetModel = "minimax/Minimax-Text-01";
-  if (finalBaseUrl.includes("siliconflow")) {
-    if (hasImages) {
-      targetModel = "Qwen/Qwen2-VL-7B-Instruct";
-    } else {
-      targetModel = "minimax/Minimax-Text-01";
-    }
-  } else if (isOllamaLocal) {
-    if (hasImages) {
-      targetModel = "llama3.2-vision";
-    } else {
-      targetModel = "llama3";
-    }
-  } else {
-    targetModel = OLLAMA_MODEL;
-  }
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json"
-  };
-  if (directApiKey) {
-    headers["Authorization"] = `Bearer ${directApiKey}`;
-  }
-
-  let endpoint = `${finalBaseUrl}/chat/completions`;
-  let requestBody: any = {};
-
-  if (isOllamaLocal) {
-    endpoint = `${finalBaseUrl}/api/chat`;
-    requestBody = {
-      model: targetModel,
-      messages: messages,
-      stream: false,
-      options: { temperature: 0.1 }
-    };
-    if (format) {
-      requestBody.format = format;
-    }
-  } else {
-    const formattedMessages = messages.map((msg: any) => {
-      if (msg.images && Array.isArray(msg.images) && msg.images.length > 0) {
-        const contentArray: any[] = [{ type: "text", text: msg.content || "" }];
-        msg.images.forEach((img: string) => {
-          const imgSrc = img.startsWith("data:") ? img : `data:image/jpeg;base64,${img}`;
-          contentArray.push({
-            type: "image_url",
-            image_url: { url: imgSrc }
-          });
-        });
-        return {
-          role: msg.role,
-          content: contentArray
-        };
-      } else {
-        return {
-          role: msg.role,
-          content: msg.content || ""
-        };
-      }
-    });
-
-    requestBody = {
-      model: targetModel,
-      messages: formattedMessages,
-      stream: false,
-      temperature: 0.1
-    };
-
-    if (format && !hasImages) {
-      requestBody.response_format = { type: "json_object" };
-    }
-  }
-
-  console.log(`[Client Fallback] Direct fetch to ${endpoint} with model ${targetModel}`);
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(requestBody)
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Direct Client API Call Failed: ${res.statusText}. Details: ${errText}`);
-  }
-
-  const resData = await res.json();
-  if (isOllamaLocal) {
-    return resData.message?.content || resData.response || "";
-  } else {
-    return resData.choices?.[0]?.message?.content || "";
-  }
 };
 
 export const callOllama = async (
@@ -303,47 +200,45 @@ export const callOllama = async (
     });
 
     if (response.status === 404) {
-      console.warn("[Client Fallback] /api/chat returned 404. Falling back to direct client-side API call.");
-      return await callDirectClientSide(finalMessages, format);
-    }
-
-    if (!response.ok) {
-      console.warn(`[Client Fallback] /api/chat returned ${response.status}. Attempting direct client-side fallback.`);
+      console.warn("[Client] /api/chat returned 404. Trying direct Gemini fallback.");
       try {
         return await callDirectClientSide(finalMessages, format);
       } catch (directErr) {
-        console.error("[Client Fallback] Direct fallback also failed:", directErr);
+        throw new Error(
+          "Server API not found. Deploy the server with your API keys, or set VITE_GEMINI_API_KEY for browser-based access."
+        );
       }
+    }
 
+    if (!response.ok) {
       const errorText = await response.text();
-      console.error("Ollama API Error:", errorText);
+      console.error("[Client] Server API error:", errorText);
       try {
         const parsed = JSON.parse(errorText);
-        if (parsed.details) {
-          try {
-            const detailObj = JSON.parse(parsed.details);
-            if (detailObj.error?.message) {
-              throw new Error(detailObj.error.message);
-            }
-          } catch (e) {}
-          throw new Error(parsed.details);
-        }
-        if (parsed.error) {
-          throw new Error(parsed.error);
-        }
+        if (parsed.details) throw new Error(parsed.details);
+        if (parsed.error) throw new Error(parsed.error);
       } catch (e: any) {
-        if (e.message && !e.message.includes("JSON")) {
-          throw e;
-        }
+        if (e.message && !e.message.includes("JSON")) throw e;
       }
-      throw new Error(`Ollama API Error: ${response.status} ${response.statusText}`);
+      throw new Error(`Server error: ${response.status}. ${errorText || response.statusText}`);
     }
 
     const data = await response.json();
     return data.message?.content || data.response || "";
   } catch (err: any) {
-    console.warn("[Client Fallback] Fetch exception calling /api/chat. Falling back to direct client-side API call.", err);
-    return await callDirectClientSide(finalMessages, format);
+    if (err.message && !err.message.includes("Server")) {
+      console.warn("[Client] Fetch failed, trying direct Gemini fallback...", err.message);
+      try {
+        return await callDirectClientSide(finalMessages, format);
+      } catch (fallbackErr: any) {
+        throw new Error(
+          "Cannot reach API server and no Gemini fallback configured. " +
+          "Set VITE_GEMINI_API_KEY in Vercel for browser-based access, " +
+          "or configure OLLAMA_BASE_URL/OLLAMA_API_KEY for server-based access."
+        );
+      }
+    }
+    throw err;
   }
 };
 
