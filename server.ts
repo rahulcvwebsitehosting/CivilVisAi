@@ -185,7 +185,7 @@ async function startServer() {
       const apiKey =
         process.env.OLLAMA_API_KEY ||
         process.env.API_KEY ||
-        "fcd67d16590f45ed82321ca41ab6707f.s4jWmTOa6qBjH6xzoO4Vd18T";
+        "";
 
       let cleanApiKey = apiKey.trim();
       if (cleanApiKey.startsWith("Bearer ")) {
@@ -195,7 +195,7 @@ async function startServer() {
       let baseUrl =
         process.env.OLLAMA_BASE_URL ||
         process.env.OLLAMA_HOST ||
-        "https://api.siliconflow.cn/v1";
+        "";
 
       // Normalize baseUrl: remove trailing slashes
       baseUrl = baseUrl.trim().replace(/\/+$/, "");
@@ -211,6 +211,13 @@ async function startServer() {
       baseUrl = baseUrl.replace(/\/+$/, "");
 
       console.log(`[Proxy] Using base URL: ${baseUrl}, API key present: ${!!apiKey}`);
+
+      if (!baseUrl) {
+        return res.status(400).json({ error: "OLLAMA_BASE_URL is not configured. Set it in your Vercel environment variables or .env file." });
+      }
+      if (!apiKey) {
+        return res.status(400).json({ error: "OLLAMA_API_KEY is not configured. Set it in your Vercel environment variables or .env file." });
+      }
 
       // SiliconFlow automatic /v1 path prefixing
       if ((baseUrl.includes("siliconflow.cn") || baseUrl.includes("siliconflow.com")) && !baseUrl.includes("/v1")) {
