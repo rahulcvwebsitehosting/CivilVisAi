@@ -60,7 +60,7 @@ try {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   // Configure body parsers with generous limits for base64 image uploads
   app.use(express.json({ limit: "50mb" }));
@@ -210,13 +210,7 @@ async function startServer() {
       // Re-remove trailing slashes after strip
       baseUrl = baseUrl.replace(/\/+$/, "");
 
-      // Smart correction: ollama.com is not a hosted API. If the user specified ollama.com
-      // with a SiliconFlow API key, we redirect the API calls to SiliconFlow.
-      const isOllamaCom = baseUrl.includes("ollama.com");
-      if (isOllamaCom) {
-        console.log(`[Proxy] Detected ollama.com base URL config. Auto-correcting to https://api.siliconflow.cn/v1`);
-        baseUrl = "https://api.siliconflow.cn/v1";
-      }
+      console.log(`[Proxy] Using base URL: ${baseUrl}, API key present: ${!!apiKey}`);
 
       // SiliconFlow automatic /v1 path prefixing
       if ((baseUrl.includes("siliconflow.cn") || baseUrl.includes("siliconflow.com")) && !baseUrl.includes("/v1")) {
@@ -233,7 +227,7 @@ async function startServer() {
       // Determine model based on capability and endpoint
       let targetModel = "minimax/Minimax-Text-01"; // Default MiniMax M3 on SiliconFlow
 
-      if (baseUrl.includes("siliconflow") || isOllamaCom) {
+      if (baseUrl.includes("siliconflow")) {
         if (hasImages) {
           // Use SiliconFlow's powerful vision model for images
           targetModel = "Qwen/Qwen2-VL-7B-Instruct";

@@ -10,9 +10,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-// @ts-ignore
-import profilePhoto from "../assets/images/rahul_profile_headshot_1782816570505.jpg";
-
 interface ProfileProps {
   onBack: () => void;
 }
@@ -156,17 +153,8 @@ const Profile: React.FC<ProfileProps> = ({ onBack }) => {
               <div className="relative group">
                 {/* Blueprint grid frame behind avatar */}
                 <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-3xl blur opacity-30 group-hover:opacity-60 transition duration-500"></div>
-                <div className="relative w-32 h-32 rounded-3xl overflow-hidden border-2 border-blue-500 bg-slate-800 flex items-center justify-center">
-                  {profilePhoto ? (
-                    <img 
-                      src={profilePhoto} 
-                      alt="Rahul Shyam" 
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <span className="text-4xl">👨‍💻</span>
-                  )}
+                <div className="relative w-32 h-32 rounded-3xl overflow-hidden border-2 border-blue-500 bg-gradient-to-br from-blue-600/30 to-purple-600/30 flex items-center justify-center">
+                  <span className="text-5xl">👨‍💻</span>
                 </div>
                 {/* Tech active status bubble */}
                 <span className="absolute bottom-1 right-1 flex h-4 w-4">

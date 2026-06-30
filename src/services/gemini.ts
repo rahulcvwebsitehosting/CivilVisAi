@@ -164,10 +164,8 @@ export const callDirectClientSide = async (
   const isOllamaLocal = directBaseUrl.includes("localhost") || directBaseUrl.includes("127.0.0.1") || directBaseUrl.includes("11434");
 
   let finalBaseUrl = directBaseUrl.trim().replace(/\/+$/, "");
-  if (finalBaseUrl.includes("ollama.com")) {
-    console.log("[Client Fallback] Detected ollama.com base URL config. Auto-correcting to https://api.siliconflow.cn/v1");
-    finalBaseUrl = "https://api.siliconflow.cn/v1";
-  }
+
+  console.log(`[Client Fallback] Using base URL: ${finalBaseUrl}, API key present: ${!!directApiKey}`);
 
   if ((finalBaseUrl.includes("siliconflow.cn") || finalBaseUrl.includes("siliconflow.com")) && !finalBaseUrl.includes("/v1")) {
     finalBaseUrl = `${finalBaseUrl}/v1`;
