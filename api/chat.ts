@@ -119,15 +119,23 @@ export default async function handler(req: any, res: any) {
       body: JSON.stringify(requestBody),
     });
 
+    console.log('[Ollama] Endpoint:', endpoint);
+    console.log('[Ollama] Model:', targetModel);
+    console.log('[Ollama] Request:', JSON.stringify(requestBody, null, 2));
+    console.log('[Ollama] Status:', response.status);
+    console.log('[Ollama] StatusText:', response.statusText);
+
+    const responseText = await response.text();
+    console.log('[Ollama] Response:', responseText);
+
     if (!response.ok) {
-      const errText = await response.text();
       return res.status(response.status).json({
         error: `API error: ${response.statusText}`,
-        details: errText,
+        details: responseText,
       });
     }
 
-    const responseData = await response.json();
+    const responseData = JSON.parse(responseText);
 
     if (useNativeFormat) {
       return res.json(responseData);
