@@ -1,8 +1,6 @@
 import { CIVIL_ENGINEER_SYSTEM_PROMPT } from "../constants.ts";
 import { StructuralAnalysis } from "../types.ts";
 
-export const OLLAMA_MODEL = "minimax m3";
-
 const safeGetEnv = (key: string): string => {
   try {
     const metaEnv = (import.meta as any).env || {};
@@ -77,7 +75,6 @@ export const callOllama = async (
       ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
     },
     body: JSON.stringify({
-      model: OLLAMA_MODEL,
       messages: finalMessages,
       format: format || undefined,
       stream: false,

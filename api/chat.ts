@@ -60,7 +60,9 @@ export default async function handler(req: any, res: any) {
         ? (process.env.OLLAMA_VISION_MODEL || 'llama3.2-vision')
         : (process.env.OLLAMA_TEXT_MODEL || 'llama3');
     } else {
-      targetModel = req.body.model || 'minimax m3';
+      targetModel = hasImages
+        ? (process.env.OLLAMA_VISION_MODEL || 'qwen3-vl:8b')
+        : (process.env.OLLAMA_TEXT_MODEL || 'minimax-m3:cloud');
     }
 
     let endpoint = `${baseUrl}/chat/completions`;
