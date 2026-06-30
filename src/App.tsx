@@ -7,7 +7,6 @@ import Knowledge from './components/Knowledge';
 import Settings from './components/Settings';
 import UploadView from './components/UploadView';
 import Profile from './components/Profile';
-import { MOCK_ANALYSES } from './constants';
 import { getOllamaApiKey } from './services/gemini';
 
 const App: React.FC = () => {
@@ -27,7 +26,7 @@ const App: React.FC = () => {
     } catch (e) {
       console.warn("Failed to load history", e);
     }
-    return MOCK_ANALYSES;
+    return [];
   });
 
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
