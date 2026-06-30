@@ -1,0 +1,8 @@
+{
+  "name": "CivilVision AI",
+  "description": "A comprehensive AI-powered assistant for civil engineering that identifies structural elements, provides an expanded knowledge base across 24 core domains, and offers interactive design tools and personal branding for engineers.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
