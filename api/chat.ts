@@ -61,7 +61,7 @@ export default async function handler(req: any, res: any) {
         : (process.env.OLLAMA_TEXT_MODEL || 'llama3');
     } else {
       targetModel = hasImages
-        ? (process.env.OLLAMA_VISION_MODEL || 'qwen3-vl:8b')
+        ? (process.env.OLLAMA_VISION_MODEL || 'qwen3.5:cloud')
         : (process.env.OLLAMA_TEXT_MODEL || 'minimax-m3:cloud');
     }
 
