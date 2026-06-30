@@ -54,117 +54,6 @@ interface OllamaMessage {
   images?: string[];
 }
 
-export const callDirectClientSide = async (
-  messages: OllamaMessage[],
-  format?: any
-): Promise<string> => {
-  // Only Gemini works directly from the browser (supports CORS)
-  const geminiKey = safeGetEnv("GEMINI_API_KEY") || safeGetEnv("VITE_GEMINI_API_KEY");
-  if (geminiKey) {
-    console.log("[Client Fallback] Calling Gemini directly from browser...");
-    try {
-      let systemInstruction = "";
-      const contents: any[] = [];
-
-      for (const msg of messages) {
-        if (msg.role === "system") {
-          systemInstruction = msg.content;
-          continue;
-        }
-
-        const role = msg.role === "assistant" ? "model" : "user";
-        const parts: any[] = [];
-
-        if (msg.content) {
-          parts.push({ text: msg.content });
-        }
-
-        if (msg.images && Array.isArray(msg.images)) {
-          for (const img of msg.images) {
-            let cleanBase64 = img;
-            let mimeType = "image/jpeg";
-            if (img.startsWith("data:")) {
-              const match = img.match(/^data:([^;]+);base64,(.*)$/);
-              if (match) {
-                mimeType = match[1];
-                cleanBase64 = match[2];
-              }
-            }
-            parts.push({
-              inlineData: {
-                mimeType: mimeType,
-                data: cleanBase64
-              }
-            });
-          }
-        }
-
-        contents.push({ role, parts });
-      }
-
-      const payload: any = { contents };
-
-      if (systemInstruction) {
-        payload.systemInstruction = {
-          parts: [{ text: systemInstruction }]
-        };
-      }
-
-      if (format) {
-        const convertSchemaTypes = (schema: any): any => {
-          if (!schema || typeof schema !== "object") return schema;
-          const result = { ...schema };
-          if (typeof result.type === "string") {
-            result.type = result.type.toUpperCase();
-          }
-          if (result.properties) {
-            const newProps: any = {};
-            for (const [k, v] of Object.entries(result.properties)) {
-              newProps[k] = convertSchemaTypes(v);
-            }
-            result.properties = newProps;
-          }
-          if (result.items) {
-            result.items = convertSchemaTypes(result.items);
-          }
-          return result;
-        };
-
-        payload.generationConfig = {
-          responseMimeType: "application/json",
-          responseSchema: convertSchemaTypes(format)
-        };
-      }
-
-      const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-      const gRes = await fetch(geminiEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (gRes.ok) {
-        const gData = await gRes.json();
-        return gData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      } else {
-        const gErrText = await gRes.text();
-        console.error("[Client Fallback] Direct Gemini API call failed:", gErrText);
-      }
-    } catch (err) {
-      console.error("[Client Fallback] Direct Gemini API call threw error:", err);
-    }
-  }
-
-  // Ollama/SiliconFlow cannot be called directly from the browser (CORS).
-  // All API calls must go through the server at /api/chat.
-  throw new Error(
-    "Server API is unreachable. Make sure your Vercel environment variables are set:\n" +
-    "  OLLAMA_BASE_URL=https://api.ollama.com\n" +
-    "  OLLAMA_API_KEY=your_key_here\n" +
-    "Or use VITE_GEMINI_API_KEY for direct browser-based access."
-  );
-};
-
 export const callOllama = async (
   messages: OllamaMessage[],
   format?: any,
@@ -181,65 +70,38 @@ export const callOllama = async (
     });
   }
 
-  try {
-    const response = await fetch(`/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
-      },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages: finalMessages,
-        format: format || undefined,
-        stream: false,
-        options: {
-          temperature: 0.1
-        }
-      })
-    });
-
-    if (response.status === 404) {
-      console.warn("[Client] /api/chat returned 404. Trying direct Gemini fallback.");
-      try {
-        return await callDirectClientSide(finalMessages, format);
-      } catch (directErr) {
-        throw new Error(
-          "Server API not found. Deploy the server with your API keys, or set VITE_GEMINI_API_KEY for browser-based access."
-        );
+  const response = await fetch(`/api/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
+    },
+    body: JSON.stringify({
+      model: OLLAMA_MODEL,
+      messages: finalMessages,
+      format: format || undefined,
+      stream: false,
+      options: {
+        temperature: 0.1
       }
-    }
+    })
+  });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Client] Server API error:", errorText);
-      try {
-        const parsed = JSON.parse(errorText);
-        if (parsed.details) throw new Error(parsed.details);
-        if (parsed.error) throw new Error(parsed.error);
-      } catch (e: any) {
-        if (e.message && !e.message.includes("JSON")) throw e;
-      }
-      throw new Error(`Server error: ${response.status}. ${errorText || response.statusText}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    let message = `Server error (${response.status})`;
+    try {
+      const parsed = JSON.parse(errorText);
+      message = parsed.error || parsed.details || message;
+      if (parsed.tip) message += `\nTip: ${parsed.tip}`;
+    } catch (e) {
+      message = errorText || message;
     }
-
-    const data = await response.json();
-    return data.message?.content || data.response || "";
-  } catch (err: any) {
-    if (err.message && !err.message.includes("Server")) {
-      console.warn("[Client] Fetch failed, trying direct Gemini fallback...", err.message);
-      try {
-        return await callDirectClientSide(finalMessages, format);
-      } catch (fallbackErr: any) {
-        throw new Error(
-          "Cannot reach API server and no Gemini fallback configured. " +
-          "Set VITE_GEMINI_API_KEY in Vercel for browser-based access, " +
-          "or configure OLLAMA_BASE_URL/OLLAMA_API_KEY for server-based access."
-        );
-      }
-    }
-    throw err;
+    throw new Error(message);
   }
+
+  const data = await response.json();
+  return data.message?.content || data.response || "";
 };
 
 const CORRECTION_DB_KEY = 'civilvision_correction_memory';
