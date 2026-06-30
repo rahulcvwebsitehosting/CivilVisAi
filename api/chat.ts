@@ -49,6 +49,8 @@ export default async function handler(req: any, res: any) {
     );
 
     const isOllamaLocal = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1') || baseUrl.includes('11434');
+    const isOllamaCloud = baseUrl.includes('api.ollama.com');
+    const useNativeFormat = isOllamaLocal || isOllamaCloud;
 
     // Determine model
     let targetModel = 'minimax/Minimax-Text-01';
@@ -68,7 +70,7 @@ export default async function handler(req: any, res: any) {
     let endpoint = `${baseUrl}/chat/completions`;
     let requestBody: any = {};
 
-    if (isOllamaLocal) {
+    if (useNativeFormat) {
       endpoint = `${baseUrl}/api/chat`;
       requestBody = {
         model: targetModel,
@@ -127,7 +129,7 @@ export default async function handler(req: any, res: any) {
 
     const responseData = await response.json();
 
-    if (isOllamaLocal) {
+    if (useNativeFormat) {
       return res.json(responseData);
     }
 
